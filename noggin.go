@@ -142,19 +142,19 @@ func (lay NeuralLayer) Init(name string, mneur int, mdend int) {
 	lay.Dends = make([]Dendrite, mdend, mdend)
 }
 
-// Noggin is 3D set of layers
-type Noggin struct {
+// Nog is 3D set of layers -- an organoid
+type Nog struct {
 	Name   string
 	Layers map[Depth]*Layer
 }
 
 // Init FULLY allocates ALL the structures for a Noggin
-func (nog Noggin) Init(name string, mcell, mneur, mdend int) {
-	nog.Name = name
+func (ng Nog) Init(name string, mcell, mneur, mdend int) {
+	ng.Name = name
 }
 
 // AddGrid places a grid of cells or neurons geometrically and then into the layer array of them
-func (lay Layer) AddGrid(nog Noggin, nrows, ncols Size, spacing XY) {
+func (lay Layer) AddGrid(nrows, ncols Size, spacing XY) {
 	var newid CellID
 	roff := ((XY(nrows) - 1) * spacing) >> 1
 	coff := ((XY(ncols) - 1) * spacing) >> 1
@@ -162,27 +162,25 @@ func (lay Layer) AddGrid(nog Noggin, nrows, ncols Size, spacing XY) {
 		for c := Size(0); c < ncols; c++ {
 			x := (XY(r) * spacing) - roff
 			y := (XY(r) * spacing) - coff
-			if lay.CellsAre == SimpleCell {
-				newid = nog.Next(SimpleCell)
-				nog.Cells[newid].X, nog.Cells[newid].Y = x, y
-			}
+			newid = lay.Next()
+			lay.Cells[newid].X, lay.Cells[newid].Y = x, y
 		}
 	}
 }
 
 // NeuronGrid makes a layer a grid of s, aligned on 0,0
-func (lay Layer) NeuronGrid(nog Noggin, nrows, ncols Size, spacing XY) {
+func (lay Layer) NeuronGrid(ng Nog, nrows, ncols Size, spacing XY) {
 	//lay.Cells = make([]Neuron, nrows*ncols) // First make the array of the correct type of cell
-	lay.AddGrid(nog, nrows, ncols, spacing) // then place them
+	lay.AddGrid(nrows, ncols, spacing) // then place them
 }
 
 // CellGrid makes a layer a grid of s, aligned on 0,0
-func (lay Layer) CellGrid(nog Noggin, nrows, ncols Size, spacing XY) {
+func (lay Layer) CellGrid(ng Nog, nrows, ncols Size, spacing XY) {
 	//lay.Cells = []Pot(make([]Cell, nrows*ncols)) // First make the array of the correct type of cell
-	lay.AddGrid(nog, nrows, ncols, spacing) // then place them
+	lay.AddGrid(nrows, ncols, spacing) // then place them
 }
 
 // AddLayer adds a layer to a noggin at a given depth
-func (nog *Noggin) AddLayer(lay Layer, z Depth) {
-	nog.Layers[z] = lay
+func (ng *Nog) AddLayer(lay Layer, z Depth) {
+	ng.Layers[z] = &lay
 }
