@@ -1,5 +1,6 @@
 // A peculiar, experimental neural network model
 // Changlog
+// AJP 28Dec16 More basic work
 // AJP 26Nov16 First real attempt
 
 package noggin
@@ -85,43 +86,71 @@ type Dendrite struct {
 
 // Layer is a flat sheet of cells
 type Layer struct {
-	Name     string    // For display porpoises
-	Z        Depth     // Spatial position of this layer
-	CellsAre ThingType // what type of cells in this layer
-	Cells    []CellID  // All the neurons or cells in this layer
+	Name  string // For display porpoises
+	Z     Depth  // Spatial position of this layer
+	ToZ   *Layer // The layer the dendrites connect to
+	NCell CellID
+	Cells []Cell // All the neurons or cells in this layer
+}
+
+// Init FULLY allocates ALL the structures for a Layer
+func (lay Layer) Init(name string, mcell int) {
+	lay.Cells = make([]Cell, mcell, mcell)
+}
+
+// Next returns to index for the next cell to be used
+func (lay Layer) Next() CellID {
+	lay.NCell++
+	return lay.NCell - 1
+}
+
+// Nexter has an array of cells which it doles out
+type Nexter interface {
+	Next() CellID
+}
+
+// Activer is a cell that computes an activity - i.e. forward pass
+type Activer interface {
+	Active()
+}
+
+// Trainer is a cell that can be trained somehow - i.e. back prop
+type Trainer interface {
+	Train()
 }
 
 // NeuralLayer is a flat sheet of neurons
 type NeuralLayer struct {
-	Layer              // it is a layer of cells, plus ...
-	Dendrites []CellID // Any dendrites live here
-	ToZ       *Layer   // The layer the dendrites connect to
+	Name    string // For display porpoises
+	Z       Depth  // Spatial position of this layer
+	ToZ     *Layer // The layer the dendrites connect to
+	nNeur   CellID
+	nDend   CellID
+	Neurons []Neuron
+	Dends   []Dendrite
+}
+
+// Next returns to index for the next cell to be used
+func (lay NeuralLayer) Next() CellID {
+	lay.nNeur++
+	return lay.nNeur - 1
+}
+
+// Init FULLY allocates ALL the structures for a Layer
+func (lay NeuralLayer) Init(name string, mneur int, mdend int) {
+	lay.Neurons = make([]Neuron, mneur, mneur)
+	lay.Dends = make([]Dendrite, mdend, mdend)
 }
 
 // Noggin is 3D set of layers
 type Noggin struct {
-	Name    string
-	Layers  map[Depth]Layer
-	Cells   []Cell
-	Neurons []Neuron
-	Dends   []Dendrite
-	cn      map[ThingType]CellID // Counts of things
+	Name   string
+	Layers map[Depth]*Layer
 }
 
 // Init FULLY allocates ALL the structures for a Noggin
 func (nog Noggin) Init(name string, mcell, mneur, mdend int) {
 	nog.Name = name
-	nog.Layers = make(map[Depth]Layer)
-	nog.Cells = make([]Cell, mcell, mcell)
-	nog.Neurons = make([]Neuron, mneur, mneur)
-	nog.Dends = make([]Dendrite, mdend, mdend)
-}
-
-// Next returns the next slot in the central array for a given type
-func (nog Noggin) Next(what ThingType) CellID {
-	x := nog.cn[what]
-	nog.cn[what] = nog.cn[what] + 1
-	return x
 }
 
 // AddGrid places a grid of cells or neurons geometrically and then into the layer array of them
