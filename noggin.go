@@ -39,12 +39,12 @@ type Cell struct {
 	act Activation // Current activation level
 }
 
-// Attracter supplies the data required to follow chemical potential
+// Attracter supplies the data required to follow an electrochemical potential
 type Attracter interface {
 	Attract(want Activation, at SubVec) (w PotWeight, dir SubVec)
 }
 
-// Attract is the attracter implementation
+// Attract is the attracter implementation for a cell
 func (c Cell) Attract(want Activation, at SubVec) (w PotWeight, dir SubVec) {
 	return w, c.pos
 }
@@ -122,7 +122,7 @@ type Trainer interface {
 	Train()
 }
 
-// NeuralLayer is a flat sheet of neurons
+// NeuralLayer is a flat sheet of neurons connected by dendrites to another layer
 type NeuralLayer struct {
 	Name    string   // For display porpoises
 	Z       Spatial  // Spatial position of this layer
@@ -168,13 +168,13 @@ func (lay Layer) AddGrid(nrows, ncols Size, spacing Spatial) {
 	}
 }
 
-// NeuronGrid makes a layer a grid of s, aligned on 0,0
+// NeuronGrid makes a grid of neurons, aligned on 0,0 (approx)
 func (lay Layer) NeuronGrid(ng Nog, nrows, ncols Size, spacing Spatial) {
 	//lay.Cells = make([]Neuron, nrows*ncols) // First make the array of the correct type of cell
 	lay.AddGrid(nrows, ncols, spacing) // then place them
 }
 
-// CellGrid makes a layer a grid of s, aligned on 0,0
+// CellGrid makes a grad of cells, aligned on 0,0 (approx)
 func (lay Layer) CellGrid(ng Nog, nrows, ncols Size, spacing Spatial) {
 	//lay.Cells = []Pot(make([]Cell, nrows*ncols)) // First make the array of the correct type of cell
 	lay.AddGrid(nrows, ncols, spacing) // then place them
