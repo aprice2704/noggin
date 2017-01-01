@@ -5,90 +5,93 @@
 
 package noggin
 
-// XY is for the two large spatial dimensions; conserve bits
-type XY int16
+// Spatial defines a dimension in space
+type Spatial int16
 
-// Size defines the number of cells in a direction (e.g. row or cols in a grid)
+// Vec defines a spatial vector with all dimensions
+type Vec struct {
+	x, y, z Spatial
+}
+
+// SubVec defines a spatial vector within a tissue (without the final dimension)
+type SubVec struct {
+	x, y Spatial
+}
+
+// Size defines a number of cells in a spatial direction (e.g. row or cols in a grid)
 type Size int16
 
-// Depth is for the layer postion, orth. to XY
-type Depth int16
-
-// DendID indexes into a central array of them; conserve bits
-//type DendID int32
-
-// DendWeight is a weighting for a dendrite
-type DendWeight int16
-
-// CellID indexes into an array of chemical potentials; conserve bits
+// CellID indexes into an array of electrochemical potentials; conserve bits
 type CellID int32
 
 // PotWeight is a weighting of a Potential
 type PotWeight int16
 
-// AnActivation is how an activation level is represented; conserve bits
-type AnActivation int8
+// Activation is how an activation level is represented; conserve bits
+type Activation int8
 
 // ActWeight is a weighting of an activation
 type ActWeight int8
 
 // Cell has a chemical potential, possibly other things
 type Cell struct {
-	Activation AnActivation // Current activation level
-	X, Y       XY           // Spatial position
+	pos SubVec     // Spatial position
+	act Activation // Current activation level
 }
 
 // Attracter supplies the data required to follow chemical potential
 type Attracter interface {
-	Pot(x XY, y XY) (w PotWeight, dx XY, dy XY)
+	Attract(want Activation, at SubVec) (w PotWeight, dir SubVec)
 }
 
-// Pot provides info to follow the potential
-func (c Cell) Pot(x XY, y XY) (w PotWeight, dx XY, dy XY) {
-	return w, x, y
+// Attract is the attracter implementation
+func (c Cell) Attract(want Activation, at SubVec) (w PotWeight, dir SubVec) {
+	return w, c.pos
 }
 
-// Neuron , unlike a basic cell, has connections
+// DendWeight is a weighting for a dendrite
+type DendWeight int16
+
+// MaxDends is the most dendrites a neuron may have
+const MaxDends = 100
+
+// DendriteIs says what a dendrite is currently doing; conserve bits
+type DendriteIs int8
+
+const (
+	growing  DendriteIs = iota // Growing dendrites are looking for a neuron to attach to
+	attached                   // Attached dendrites have found a neuron and linked to it
+)
+
+// Dendrite represents a connection from a neuron to another cell, it is part of the cell from which it emanates
+type Dendrite struct {
+	To     CellID     // Neuron/cell it is closest to, or touching
+	Weight ActWeight  // How important is this dendrite?; conserve bits
+	Doing  DendriteIs // what it is doing
+}
+
+// Neuron ,unlike a basic cell, has connections -- dendrites
 type Neuron struct {
-	Cell                   // a neuron is a cell plus ...
-	Axon      AnActivation // Current input from axon (used during training)
-	Dendrites []CellID     // Dendrites begining at this neuron
+	Cell                      // a neuron is a cell plus ...
+	Axon   Activation         // Current input from axon (used during training)
+	nDends int16              // Number of dendrites
+	Dends  [MaxDends]Dendrite // Dendrites begining at this neuron -- note: pre-allocated ARRAY
 }
 
 // ThingType -- whether neuron or simple cell etc.
 type ThingType int8
 
 const (
-	// SimpleCell is just a humble cell e.g. photoreceptor
-	SimpleCell ThingType = iota
-	// NeuronCell is a full-fledged neuron
-	NeuronCell
-	// DendriteCell is a dendrite (not really a separate cell)
-	DendriteCell
+	simpleCell   ThingType = iota // simpleCell is just a humble cell e.g. photoreceptor
+	neuronCell                    // neuronCell is a full-fledged neuron
+	dendriteCell                  // dendriteCell is a dendrite (not really a separate cell)
 )
-
-// DendriteIs says what a dendrite is currently doing; conserve bits
-type DendriteIs int8
-
-const (
-	// Growing dendrites are looking for a neuron to attach to
-	Growing DendriteIs = iota
-	// Attached dendrites have found a neuron and linked to it
-	Attached
-)
-
-// Dendrite represents a connection from a neuron to another cell
-type Dendrite struct {
-	Doing  DendriteIs // what is it up to
-	To     CellID     // Neuron/cell it is closest to, or touching
-	Weight ActWeight  // How important is this dendrite?; conserve bits
-}
 
 // Layer is a flat sheet of cells
 type Layer struct {
-	Name  string // For display porpoises
-	Z     Depth  // Spatial position of this layer
-	ToZ   *Layer // The layer the dendrites connect to
+	Name  string  // For display porpoises
+	Z     Spatial // Spatial position of this layer
+	ToZ   *Layer  // The layer the dendrites connect to
 	NCell CellID
 	Cells []Cell // All the neurons or cells in this layer
 }
@@ -121,13 +124,11 @@ type Trainer interface {
 
 // NeuralLayer is a flat sheet of neurons
 type NeuralLayer struct {
-	Name    string // For display porpoises
-	Z       Depth  // Spatial position of this layer
-	ToZ     *Layer // The layer the dendrites connect to
-	nNeur   CellID
-	nDend   CellID
-	Neurons []Neuron
-	Dends   []Dendrite
+	Name    string   // For display porpoises
+	Z       Spatial  // Spatial position of this layer
+	ToZ     *Layer   // The layer the dendrites connect to
+	nNeur   CellID   // Neuron count
+	Neurons []Neuron // All the neurons in this layer
 }
 
 // Next returns to index for the next cell to be used
@@ -137,15 +138,14 @@ func (lay NeuralLayer) Next() CellID {
 }
 
 // Init FULLY allocates ALL the structures for a Layer
-func (lay NeuralLayer) Init(name string, mneur int, mdend int) {
-	lay.Neurons = make([]Neuron, mneur, mneur)
-	lay.Dends = make([]Dendrite, mdend, mdend)
+func (lay NeuralLayer) Init(name string, maxneur int) {
+	lay.Neurons = make([]Neuron, maxneur, maxneur)
 }
 
-// Nog is 3D set of layers -- an organoid
+// Nog is a set of layers -- an organoid
 type Nog struct {
 	Name   string
-	Layers map[Depth]*Layer
+	Layers map[Spatial]*Layer
 }
 
 // Init FULLY allocates ALL the structures for a Noggin
@@ -154,33 +154,33 @@ func (ng Nog) Init(name string, mcell, mneur, mdend int) {
 }
 
 // AddGrid places a grid of cells or neurons geometrically and then into the layer array of them
-func (lay Layer) AddGrid(nrows, ncols Size, spacing XY) {
+func (lay Layer) AddGrid(nrows, ncols Size, spacing Spatial) {
 	var newid CellID
-	roff := ((XY(nrows) - 1) * spacing) >> 1
-	coff := ((XY(ncols) - 1) * spacing) >> 1
+	roff := ((Spatial(nrows) - 1) * spacing) >> 1
+	coff := ((Spatial(ncols) - 1) * spacing) >> 1
 	for r := Size(0); r < nrows; r++ {
 		for c := Size(0); c < ncols; c++ {
-			x := (XY(r) * spacing) - roff
-			y := (XY(r) * spacing) - coff
+			x := (Spatial(r) * spacing) - roff
+			y := (Spatial(r) * spacing) - coff
 			newid = lay.Next()
-			lay.Cells[newid].X, lay.Cells[newid].Y = x, y
+			lay.Cells[newid].pos = SubVec{x, y}
 		}
 	}
 }
 
 // NeuronGrid makes a layer a grid of s, aligned on 0,0
-func (lay Layer) NeuronGrid(ng Nog, nrows, ncols Size, spacing XY) {
+func (lay Layer) NeuronGrid(ng Nog, nrows, ncols Size, spacing Spatial) {
 	//lay.Cells = make([]Neuron, nrows*ncols) // First make the array of the correct type of cell
 	lay.AddGrid(nrows, ncols, spacing) // then place them
 }
 
 // CellGrid makes a layer a grid of s, aligned on 0,0
-func (lay Layer) CellGrid(ng Nog, nrows, ncols Size, spacing XY) {
+func (lay Layer) CellGrid(ng Nog, nrows, ncols Size, spacing Spatial) {
 	//lay.Cells = []Pot(make([]Cell, nrows*ncols)) // First make the array of the correct type of cell
 	lay.AddGrid(nrows, ncols, spacing) // then place them
 }
 
 // AddLayer adds a layer to a noggin at a given depth
-func (ng *Nog) AddLayer(lay Layer, z Depth) {
+func (ng *Nog) AddLayer(lay Layer, z Spatial) {
 	ng.Layers[z] = &lay
 }
